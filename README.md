@@ -10,8 +10,7 @@ One example on running the code:
 
 **FFNN**
 
-``python ffnn.py --hidden_dim 10 --epochs 1 ``
-``--train_data ./training.json --val_data ./validation.json``
+``python ffnn.py --hidden_dim 1,5,10,25 --epochs 1,5,10,25 --train_data ./training.json --val_data ./validation.json --test_data ./test.json ``
 
 
 **RNN**
