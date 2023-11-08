@@ -99,11 +99,21 @@ def load_data(path):
 
     return d
 
-def custom_print(dimension,epoch,str):
-    print(str)
-    f = open(f'logs/ffnn/d_{dimension}_e_{epoch}.txt','a')
-    f.write(f"{str}\n")
-    f.close()
+class CSVLogger:
+    def __init__(self,path,header) -> None:
+        f = open(path,'w')
+        f.write(header)
+        f.close()    
+        self.path = path
+        self.csv = []
+
+    def log(self,line):
+        self.csv.append(line)
+    
+    def save(self):
+        f = open(self.path,'a')
+        f.write("\n".join(self.csv))
+        f.close()
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -124,6 +134,8 @@ if __name__ == "__main__":
     random.seed(42)
     torch.manual_seed(42)
 
+    training_logger = CSVLogger("results/ffnn_logs.csv",f"Dimension,Total Epochs,Current Epoch,Training Accuracy,Training Time,Validation Accuracy,Validation Time\n") 
+    test_logger = CSVLogger("results/ffnn_result.csv","Dimension,Total Epochs, Test Accuracy, Test Time\n")
     # load data
     print("========== Loading data ==========")
     # X_data is a list of pairs (document, y); y in {0,1,2,3,4}
@@ -141,16 +153,15 @@ if __name__ == "__main__":
         model = FFNN(input_dim=len(vocab), h=int(dimension))
         optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
         for epochs in epochs_array:
-            custom_print(dimension,epochs,f"========== Initializing Model with {dimension} hidden dimensions and training for {epochs} ==========")
+            print(f"========== Initializing Model with {dimension} hidden dimensions and training for {epochs} ==========")
             for epoch in range(int(epochs)):
-                custom_print(dimension,epochs,f"========== Training for {epoch} epoch ==========")
+                print(f"{epoch+1}:")
                 model.train()
                 optimizer.zero_grad()
                 loss = None
                 correct = 0
                 total = 0
                 start_time = time.time()
-                custom_print(dimension,epochs,"Training started for epoch {}".format(epoch + 1))
                 # Good practice to shuffle order of training data
                 random.shuffle(train_data)
                 minibatch_size = 16
@@ -174,16 +185,18 @@ if __name__ == "__main__":
                     loss = loss / minibatch_size
                     loss.backward()
                     optimizer.step()
-                custom_print(dimension,epochs,"Training completed for epoch {}".format(epoch + 1))
-                custom_print(dimension,epochs,"Training accuracy for epoch {}: {}".format(
-                    epoch + 1, correct / total))
-                custom_print(dimension,epochs,"Training time for this epoch: {}".format(time.time() - start_time))
+                tr_acc= correct / total
+                tr_time = time.time() - start_time
+                print("Training completed for epoch {}".format(epoch + 1))
+                print("Training accuracy for epoch {}: {}".format(
+                    epoch + 1, tr_acc))
+                print("Training time for this epoch: {}".format(tr_time))
 
                 loss = None
                 correct = 0
                 total = 0
                 start_time = time.time()
-                custom_print(dimension,epochs,"Validation started for epoch {}".format(epoch + 1))
+                print("Validation started for epoch {}".format(epoch + 1))
                 minibatch_size = 16
                 N = len(valid_data)
                 for minibatch_index in tqdm(range(N // minibatch_size)):
@@ -203,32 +216,55 @@ if __name__ == "__main__":
                         else:
                             loss += example_loss
                     loss = loss / minibatch_size
-                custom_print(dimension,epochs,"Validation completed for epoch {}".format(epoch + 1))
-                custom_print(dimension,epochs,"Validation accuracy for epoch {}: {}".format(
+                
+                val_acc= correct / total
+                val_time = time.time() - start_time
+
+                print("Validation completed for epoch {}".format(epoch + 1))
+                print("Validation accuracy for epoch {}: {}".format(
                     epoch + 1, correct / total))
-                custom_print(dimension,epochs,"Validation time for this epoch: {}".format(
+                print("Validation time for this epoch: {}".format(
                     time.time() - start_time))
+                training_logger.log(",".join([str(dimension),str(epochs),str(epoch+1),str(tr_acc),str(tr_time),str(val_acc),str(val_time)]))
 
             if args.test_data != 'to fill':
-                custom_print(dimension,epochs,"=====Loading Test Data ====")
+                print("=====Loading Test Data ====")
                 test_data = load_data(args.test_data)
-                custom_print(dimension,epochs,"=====Vectorizing Test Data ====")
+                print("=====Vectorizing Test Data ====")
                 test_data = convert_to_vector_representation(test_data, word2index)
                 predictions = []
 
                 model.eval()  # Set the model to evaluation mode
                 with torch.no_grad():
-                    for input_vector, _ in tqdm(test_data):
-                        predicted_vector = model(input_vector)
-                        predicted_label = torch.argmax(predicted_vector).item()
-                        predictions.append(predicted_label)
+                    minibatch_size = 16
+                    N = len(test_data)
+                    start_time = time.time()
 
-                # Write predictions to an external file
-                file_name = f"results/ffnn/test_d_{dimension}_e_{epoch}.out"
-                with open(file_name, 'w') as f:
-                    for prediction in predictions:
-                        f.write(str(prediction) + '\n')
+                    for minibatch_index in tqdm(range(N // minibatch_size)):
+                        optimizer.zero_grad()
+                        loss = None
+                        for example_index in range(minibatch_size):
+                            input_vector, gold_label = test_data[minibatch_index *
+                                                                minibatch_size + example_index]
+                            predicted_vector = model(input_vector)
+                            predicted_label = torch.argmax(predicted_vector)
+                            correct += int(predicted_label == gold_label)
+                            total += 1
+                            example_loss = model.compute_Loss(
+                                predicted_vector.view(1, -1), torch.tensor([gold_label]))
+                            if loss is None:
+                                loss = example_loss
+                            else:
+                                loss += example_loss
+                        loss = loss / minibatch_size
+                
+                test_acc= correct / total
+                test_time = time.time() - start_time
+                print(f"Test Accuracy for {dimension} dimensions and {epochs} epochs is {test_acc}")
+  
+                test_logger.log(','.join([str(dimension),str(epochs),str(test_acc),str(test_time)]))
 
-                custom_print(dimension,epoch,f"Test predictions written to {file_name}")
 
+    training_logger.save()
+    test_logger.save()
     # write out to results/test.out
