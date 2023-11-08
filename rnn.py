@@ -112,7 +112,7 @@ if __name__ == "__main__":
         last_train_accuracy = 0
         last_validation_accuracy = 0
         for epochs in epochs_array:
-            while not stopping_condition:
+            for epoch in range(int(epochs)):
                 start_time = time.time()
                 random.shuffle(train_data)
                 model.train()
@@ -197,14 +197,13 @@ if __name__ == "__main__":
                 training_logger.log(",".join([str(dimension),str(epochs),str(epoch+1),str(trainning_accuracy),str(training_time),str(validation_accuracy),str(val_time)]))
 
                 if validation_accuracy < last_validation_accuracy and trainning_accuracy > last_train_accuracy:
-                    stopping_condition=True
                     print("Training done to avoid overfitting!")
                     print(f"Best validation accuracy is: {last_validation_accuracy}")
+                    break
                 else:
                     last_validation_accuracy = validation_accuracy
                     last_train_accuracy = trainning_accuracy
 
-                epoch += 1
 
             if args.test_data != 'to fill':
                 print("=====Loading Test Data ====")
