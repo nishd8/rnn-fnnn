@@ -1,10 +1,4 @@
-# starter code for a2
-
-Add the corresponding (one) line under the ``[to fill]`` in ``def forward()`` of the class for ffnn.py and rnn.py
-
-Feel free to modify other part of code, they are just for your reference.
-
----
+# code for a2
 
 One example on running the code:
 
@@ -15,5 +9,4 @@ One example on running the code:
 
 **RNN**
 
-``python rnn.py --hidden_dim 32 --epochs 10 ``
-``--train_data training.json --val_data validation.json``
+``python rnn.py --hidden_dim 1,5,10,25 --epochs 1,5,10,25 --train_data ./training.json --val_data ./validation.json --test_data ./test.json ``
